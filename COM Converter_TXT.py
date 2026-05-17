@@ -17,7 +17,7 @@ def clean_block(text):
     text = text.replace('\u2013', ' - ').replace('\u2014', ' — ')
     text = text.replace('\ufffd', '—')
     # Normalise bullet characters to em dash so they get rejoined with their text
-    text = text.replace('•', '—').replace('▪', '—')
+    text = text.replace('•', '—').replace('▪', '—').replace('\uf0b7', '—')
     # Rejoin bullet/dash with the text that follows on the next line
     text = re.sub(r'—\n', '— ', text)
     # Join wrapped lines within the block repeatedly until stable
@@ -106,7 +106,7 @@ while i < len(lines):
     line = lines[i]
     # Skip blank lines but check if the *next* non-empty line is a lowercase continuation
     if not line.strip():
-        # Look ahead for the next non-empty line
+        # Look ahead past blank lines for the next content line, but stop at page markers
         j = i + 1
         while j < len(lines) and not lines[j].strip():
             j += 1
@@ -119,7 +119,7 @@ while i < len(lines):
             and not lines[j].startswith('[')
             and not rejoined[-1].strip().isupper()
             and not re.match(r'^[IVX]+[\.\d]', rejoined[-1].strip())
-            and len(lines[j].strip()) > 60
+            and len(rejoined[-1].strip()) > 30
             and '[Page 1]' not in '\n'.join(rejoined[-10:])
         ):
             # Continuation across a page break — skip the blank line(s)
@@ -135,7 +135,7 @@ while i < len(lines):
         and not re.search(r'[.!?]$', rejoined[-1].rstrip())
         and not rejoined[-1].strip().isupper()
         and not re.match(r'^[IVX]+[\.\d]', rejoined[-1].strip())
-        and len(line.strip()) > 60
+        and len(rejoined[-1].strip()) > 30
     ):
         rejoined[-1] = rejoined[-1].rstrip() + ' ' + line.strip()
     else:
