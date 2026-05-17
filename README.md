@@ -27,26 +27,6 @@ If you prefer to keep them in separate folders, you can instead type the full pa
 
 ---
 
-## How to run it in Jupyter
-
-Open a new cell and run:
-
-```python
-%run convert_oj_pdf.py
-```
-
-You will be prompted:
-
-```
-Enter PDF filename (e.g. COM(2025)47.pdf):
-```
-
-Type the filename exactly as it appears, including the `.pdf` extension, and press Enter. The script will save the output as a `.txt` file in the same folder, with the same name as the PDF.
-
-For example: `COM(2025)47.pdf` → `COM(2025)47.txt`
-
----
-
 ## If your PDF is in a different folder
 
 You can type the full path instead of just the filename. For example:
