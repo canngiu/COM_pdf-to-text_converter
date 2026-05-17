@@ -88,13 +88,58 @@ for page in doc:
 full_text = '\n\n'.join(output)
 
 # Rejoin section numbers with their titles when split across blocks
-# e.g. "I.\n\nINTRODUCTION" -> "I. INTRODUCTION"
+# e.g. "I.\nINTRODUCTION" -> "I. INTRODUCTION" — must run BEFORE the line joiner
 full_text = re.sub(
     r'^((?:I{1,3}V?|VI{0,3}|I{0,3}V)(?:\.\d+)?)\.(\n)',
     r'\1. ',
     full_text,
     flags=re.MULTILINE
 )
+
+# Rejoin paragraphs/footnotes split across page breaks or block boundaries:
+# if a block ends without terminal punctuation and the next non-empty line
+# starts with a lowercase letter, it is a continuation
+lines = full_text.split('\n')
+rejoined = []
+i = 0
+while i < len(lines):
+    line = lines[i]
+    # Skip blank lines but check if the *next* non-empty line is a lowercase continuation
+    if not line.strip():
+        # Look ahead for the next non-empty line
+        j = i + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+        if (
+            j < len(lines)
+            and rejoined
+            and rejoined[-1].strip()
+            and not rejoined[-1].strip().startswith('[')
+            and not re.search(r'[.!?]$', rejoined[-1].rstrip())
+            and not lines[j].startswith('[')
+            and not rejoined[-1].strip().isupper()
+            and not re.match(r'^[IVX]+[\.\d]', rejoined[-1].strip())
+        ):
+            # Continuation across a page break — skip the blank line(s)
+            rejoined[-1] = rejoined[-1].rstrip() + ' ' + lines[j].strip()
+            i = j + 1
+            continue
+    if (
+        rejoined
+        and line
+        and not line.startswith('[')
+        and rejoined[-1].strip()
+        and not rejoined[-1].strip().startswith('[')
+        and not re.search(r'[.!?]$', rejoined[-1].rstrip())
+        and not rejoined[-1].strip().isupper()
+        and not re.match(r'^[IVX]+[\.\d]', rejoined[-1].strip())
+        and len(line.strip()) > 60
+    ):
+        rejoined[-1] = rejoined[-1].rstrip() + ' ' + line.strip()
+    else:
+        rejoined.append(line)
+    i += 1
+full_text = '\n'.join(rejoined)
 
 with open(output_path, "w", encoding="utf-8") as f:
     f.write(full_text)
