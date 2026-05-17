@@ -38,19 +38,6 @@ The output `.txt` file will be saved in the same folder as the PDF.
 
 ---
 
-## Checking which folder Jupyter is working from
-
-If you are unsure where Jupyter is currently looking for files, run this in a cell:
-
-```python
-import os
-os.getcwd()
-```
-
-This prints your current working directory. Place your PDFs there, or move the script there, to avoid typing full paths.
-
----
-
 ## Known limitations
 
 - The script is calibrated for Official Journal documents and standard EUR-Lex COM documents. It may not work correctly on PDFs with a substantially different layout (e.g. annexes, staff working documents, impact assessments).
