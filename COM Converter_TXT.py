@@ -119,6 +119,8 @@ while i < len(lines):
             and not lines[j].startswith('[')
             and not rejoined[-1].strip().isupper()
             and not re.match(r'^[IVX]+[\.\d]', rejoined[-1].strip())
+            and len(lines[j].strip()) > 60
+            and '[Page 1]' not in '\n'.join(rejoined[-10:])
         ):
             # Continuation across a page break — skip the blank line(s)
             rejoined[-1] = rejoined[-1].rstrip() + ' ' + lines[j].strip()
