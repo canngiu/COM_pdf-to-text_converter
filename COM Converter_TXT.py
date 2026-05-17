@@ -10,12 +10,16 @@ output = []
 
 def clean_block(text):
     text = text.replace('\r\n', '\n')
+    # Normalise quotes
     text = text.replace('\u2018', "'").replace('\u2019', "'")
     text = text.replace('\u201c', '"').replace('\u201d', '"')
-    text = text.replace('\u2013', '-').replace('\u2014', '—')
-    text = text.replace('\ufffd', '—')  # catches the ��� replacement character
+    # Normalise dashes and replacement characters (handles ��� from some encodings)
+    text = text.replace('\u2013', '—').replace('\u2014', '—')
+    text = text.replace('\ufffd', '—')
+    # Normalise bullet characters to em dash so they get rejoined with their text
+    text = text.replace('•', '—').replace('▪', '—')
+    # Rejoin bullet/dash with the text that follows on the next line
     text = re.sub(r'—\n', '— ', text)
-    text = re.sub(r'^((?:I{1,3}V?|VI{0,3}|I{0,3}V)(?:\.\d+)?)\.\n', r'\1. ', text, flags=re.MULTILINE)
     # Join wrapped lines within the block repeatedly until stable
     prev = None
     while prev != text:
@@ -82,6 +86,15 @@ for page in doc:
     output.append('\n\n'.join(page_lines))
 
 full_text = '\n\n'.join(output)
+
+# Rejoin section numbers with their titles when split across blocks
+# e.g. "I.\n\nINTRODUCTION" -> "I. INTRODUCTION"
+full_text = re.sub(
+    r'^((?:I{1,3}V?|VI{0,3}|I{0,3}V)(?:\.\d+)?)\.(\n)',
+    r'\1. ',
+    full_text,
+    flags=re.MULTILINE
+)
 
 with open(output_path, "w", encoding="utf-8") as f:
     f.write(full_text)
