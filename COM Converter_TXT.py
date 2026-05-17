@@ -12,7 +12,10 @@ def clean_block(text):
     text = text.replace('\r\n', '\n')
     text = text.replace('\u2018', "'").replace('\u2019', "'")
     text = text.replace('\u201c', '"').replace('\u201d', '"')
+    text = text.replace('\u2013', '-').replace('\u2014', '—')
+    text = text.replace('\ufffd', '—')  # catches the ��� replacement character
     text = re.sub(r'—\n', '— ', text)
+    text = re.sub(r'^((?:I{1,3}V?|VI{0,3}|I{0,3}V)(?:\.\d+)?)\.\n', r'\1. ', text, flags=re.MULTILINE)
     # Join wrapped lines within the block repeatedly until stable
     prev = None
     while prev != text:
