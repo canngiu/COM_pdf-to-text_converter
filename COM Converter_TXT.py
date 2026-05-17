@@ -13,8 +13,8 @@ def clean_block(text):
     # Normalise quotes
     text = text.replace('\u2018', "'").replace('\u2019', "'")
     text = text.replace('\u201c', '"').replace('\u201d', '"')
-    # Normalise dashes and replacement characters (handles ��� from some encodings)
-    text = text.replace('\u2013', '—').replace('\u2014', '—')
+    # Normalise dashes and replacement characters
+    text = text.replace('\u2013', ' - ').replace('\u2014', ' — ')
     text = text.replace('\ufffd', '—')
     # Normalise bullet characters to em dash so they get rejoined with their text
     text = text.replace('•', '—').replace('▪', '—')
@@ -65,8 +65,8 @@ def is_noise_block(text, page_height):
 def mark_footnotes(text):
     # Mark footnote text at bottom of page: (1) followed by lowercase
     text = re.sub(r'\((\d{1,2})\)\s+(?=[a-z\'\"])', r'\n[FOOTNOTE \1] ', text)
-    # Mark inline refs: number glued to end of a word, e.g. "report2" or "standards33"
-    text = re.sub(r'(?<=[a-zA-Z])(\d{1,2})(?=[\s,\.;:\)\]]|$)', r'[\1]', text)
+    # Mark inline refs: number glued to end of a word or closing quote, e.g. "report2" or "plating'3"
+    text = re.sub(r'(?<=[a-zA-Z\'\u2019])(\d{1,2})(?=[\s,\.;:\)\]]|$)', r'[\1]', text)
     return text
 
 for page in doc:
