@@ -14,7 +14,7 @@ def clean_block(text):
     text = text.replace('\u201c', '"').replace('\u201d', '"')
     text = text.replace('\u2013', ' - ').replace('\u2014', ' — ')
     text = text.replace('\ufffd', '—')
-    text = text.replace('•', '—').replace('▪', '—').replace('\uf0b7', '—')
+    text = text.replace('•', '—').replace('▪', '—').replace('\uf0b7', '—').replace('\uf02d', '—')
     text = re.sub(r'—\n', '— ', text)
     prev = None
     while prev != text:
@@ -49,12 +49,22 @@ def is_noise_block(text, page_height):
         return True
     if re.match(r'^\d+$', t) and page_height and page_height > 0:
         return True
+    # Repeated communication header block (appears at top of page 2 in some COMs)
+    if re.match(r'^COMMUNICATION FROM THE COMMISSION TO THE EUROPEAN', t):
+        return True
+    # Trailing fragment of the repeated header
+    if re.match(r'^(OF THE REGIONS|COMMITTEE AND THE COMMITTEE OF THE REGIONS)$', t):
+        return True
     if not t:
         return True
     return False
 
 def mark_footnotes(text):
+    # Format: (1) followed by lowercase — OJ style
     text = re.sub(r'\((\d{1,2})\)\s+(?=[a-z\'\"])', r'\n[FOOTNOTE \1] ', text)
+    # Format: bare number + two spaces at start of line — COM style e.g. "1  OECD..."
+    text = re.sub(r'(?m)^\s*(\d{1,2})\s{2,}(?=[A-Z])', r'\n[FOOTNOTE \1] ', text)
+    # Inline refs: number glued to end of a word or closing quote
     text = re.sub(r'(?<=[a-zA-Z\'\u2019])(\d{1,2})(?=[\s,\.;:\)\]]|$)', r'[\1]', text)
     return text
 
@@ -68,7 +78,7 @@ def should_join(last, next_line):
         return False
     if last.isupper():
         return False
-    if re.match(r'^[IVX]+[\.\d]', last):
+    if re.match(r'^(?:[IVX]+|\d+)[\.\d]', last):
         return False
     # Don't join short lines (headings) to anything
     if len(last) < 60:
@@ -110,9 +120,9 @@ for page in doc:
 
 full_text = '\n\n'.join(output)
 
-# Rejoin section numbers with their titles — must run BEFORE the line joiner
+# Rejoin section numbers with their titles — handles both Roman (I. II.) and Arabic (1. 2. 5.1.)
 full_text = re.sub(
-    r'^((?:I{1,3}V?|VI{0,3}|I{0,3}V)(?:\.\d+)?)\.(\n)',
+    r'^((?:I{1,3}V?|VI{0,3}|I{0,3}V)(?:\.\d+)?|\d+(?:\.\d+)*)\.(\n)',
     r'\1. ',
     full_text,
     flags=re.MULTILINE
