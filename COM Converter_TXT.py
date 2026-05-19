@@ -10,17 +10,12 @@ output = []
 
 def clean_block(text):
     text = text.replace('\r\n', '\n')
-    # Normalise quotes
     text = text.replace('\u2018', "'").replace('\u2019', "'")
     text = text.replace('\u201c', '"').replace('\u201d', '"')
-    # Normalise dashes and replacement characters
     text = text.replace('\u2013', ' - ').replace('\u2014', ' — ')
     text = text.replace('\ufffd', '—')
-    # Normalise bullet characters to em dash so they get rejoined with their text
     text = text.replace('•', '—').replace('▪', '—').replace('\uf0b7', '—')
-    # Rejoin bullet/dash with the text that follows on the next line
     text = re.sub(r'—\n', '— ', text)
-    # Join wrapped lines within the block repeatedly until stable
     prev = None
     while prev != text:
         prev = text
@@ -45,36 +40,64 @@ def clean_block(text):
 
 def is_noise_block(text, page_height):
     t = text.strip()
-    # Standalone EN / EN EN (language marker on cover page)
     if re.match(r'^(EN\s*)+$', t):
         return True
-    # OJ header: date + EN + C 287/X + Official Journal (2001-era documents)
     if re.match(
         r'(C \d+/\d+\s*\n|\d{1,2}\.\d{1,2}\.\d{4}\s*\n).*Official Journal',
         t, re.DOTALL
     ):
         return True
-    # Standalone page number at the bottom of the page (non-OJ documents)
     if re.match(r'^\d+$', t) and page_height and page_height > 0:
         return True
-    # Empty or whitespace-only block
     if not t:
         return True
     return False
 
 def mark_footnotes(text):
-    # Mark footnote text at bottom of page: (1) followed by lowercase
     text = re.sub(r'\((\d{1,2})\)\s+(?=[a-z\'\"])', r'\n[FOOTNOTE \1] ', text)
-    # Mark inline refs: number glued to end of a word or closing quote, e.g. "report2" or "plating'3"
     text = re.sub(r'(?<=[a-zA-Z\'\u2019])(\d{1,2})(?=[\s,\.;:\)\]]|$)', r'[\1]', text)
     return text
 
+def should_join(last, next_line):
+    """Return True only if last line is a wrapped sentence continuation."""
+    if not last or not next_line:
+        return False
+    if last.startswith('[') or next_line.startswith('['):
+        return False
+    if re.search(r'[.!?]$', last):
+        return False
+    if last.isupper():
+        return False
+    if re.match(r'^[IVX]+[\.\d]', last):
+        return False
+    # Don't join short lines (headings) to anything
+    if len(last) < 60:
+        return False
+    # Don't join if the next line starts a new bullet
+    if next_line.startswith('—'):
+        return False
+    return True
+
 for page in doc:
-    blocks = page.get_text('blocks')
+    raw_blocks = page.get_text('blocks')
     page_height = page.rect.height
     page_lines = [f"[Page {page.number + 1}]"]
 
-    for b in blocks:
+    # Merge standalone dash/bullet blocks with the block that follows
+    merged_blocks = []
+    pending_bullet = False
+    for b in raw_blocks:
+        t = b[4].strip()
+        if t == '—':
+            pending_bullet = True
+            continue
+        if pending_bullet:
+            merged_blocks.append((b[0], b[1], b[2], b[3], '— ' + b[4], b[5], b[6]))
+            pending_bullet = False
+        else:
+            merged_blocks.append(b)
+
+    for b in merged_blocks:
         text = b[4]
         if is_noise_block(text, page_height):
             continue
@@ -87,8 +110,7 @@ for page in doc:
 
 full_text = '\n\n'.join(output)
 
-# Rejoin section numbers with their titles when split across blocks
-# e.g. "I.\nINTRODUCTION" -> "I. INTRODUCTION" — must run BEFORE the line joiner
+# Rejoin section numbers with their titles — must run BEFORE the line joiner
 full_text = re.sub(
     r'^((?:I{1,3}V?|VI{0,3}|I{0,3}V)(?:\.\d+)?)\.(\n)',
     r'\1. ',
@@ -96,47 +118,29 @@ full_text = re.sub(
     flags=re.MULTILINE
 )
 
-# Rejoin paragraphs/footnotes split across page breaks or block boundaries:
-# if a block ends without terminal punctuation and the next non-empty line
-# starts with a lowercase letter, it is a continuation
+# Rejoin wrapped sentences split across block boundaries (not across page breaks)
 lines = full_text.split('\n')
 rejoined = []
 i = 0
 while i < len(lines):
     line = lines[i]
-    # Skip blank lines but check if the *next* non-empty line is a lowercase continuation
     if not line.strip():
-        # Look ahead past blank lines for the next content line, but stop at page markers
         j = i + 1
         while j < len(lines) and not lines[j].strip():
             j += 1
+        last = rejoined[-1].strip() if rejoined else ''
+        next_line = lines[j].strip() if j < len(lines) else ''
         if (
             j < len(lines)
-            and rejoined
-            and rejoined[-1].strip()
-            and not rejoined[-1].strip().startswith('[')
-            and not re.search(r'[.!?]$', rejoined[-1].rstrip())
             and not lines[j].startswith('[')
-            and not rejoined[-1].strip().isupper()
-            and not re.match(r'^[IVX]+[\.\d]', rejoined[-1].strip())
-            and len(rejoined[-1].strip()) > 30
+            and should_join(last, next_line)
             and '[Page 1]' not in '\n'.join(rejoined[-10:])
         ):
-            # Continuation across a page break — skip the blank line(s)
             rejoined[-1] = rejoined[-1].rstrip() + ' ' + lines[j].strip()
             i = j + 1
             continue
-    if (
-        rejoined
-        and line
-        and not line.startswith('[')
-        and rejoined[-1].strip()
-        and not rejoined[-1].strip().startswith('[')
-        and not re.search(r'[.!?]$', rejoined[-1].rstrip())
-        and not rejoined[-1].strip().isupper()
-        and not re.match(r'^[IVX]+[\.\d]', rejoined[-1].strip())
-        and len(rejoined[-1].strip()) > 30
-    ):
+    last = rejoined[-1].strip() if rejoined else ''
+    if should_join(last, line.strip()):
         rejoined[-1] = rejoined[-1].rstrip() + ' ' + line.strip()
     else:
         rejoined.append(line)
